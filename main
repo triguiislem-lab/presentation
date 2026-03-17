@@ -1,0 +1,896 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CDSS Pipeline — Démonstration Interactive</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#060912;--surface:#0c1220;--card:#111827;--card2:#161f30;
+  --border:rgba(255,255,255,0.06);--border2:rgba(255,255,255,0.12);
+  --text:#f0f4ff;--muted:#5a6a8a;--dim:#8898b0;
+  --teal:#00e5b8;--blue:#4da6ff;--amber:#ffb347;--red:#ff6b6b;--purple:#a78bfa;
+  --font:'Space Grotesk',sans-serif;--mono:'JetBrains Mono',monospace;
+}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--font);overflow:hidden}
+
+/* ══════ LAYOUT ══════ */
+.app{display:grid;grid-template-rows:56px 1fr 90px;height:100vh}
+
+/* ══════ TOP BAR ══════ */
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:0 28px;border-bottom:1px solid var(--border);background:rgba(6,9,18,.9);backdrop-filter:blur(12px);z-index:10}
+.logo{display:flex;align-items:center;gap:10px;font-size:13px;font-weight:600;letter-spacing:.06em;text-transform:uppercase}
+.logo-dot{width:8px;height:8px;border-radius:50%;background:var(--teal);animation:pulse 2s ease-in-out infinite}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(0,229,184,.4)}50%{box-shadow:0 0 0 6px rgba(0,229,184,0)}}
+.step-counter{font-family:var(--mono);font-size:12px;color:var(--muted)}
+.step-counter span{color:var(--text);font-weight:500}
+.topbar-right{display:flex;align-items:center;gap:12px}
+.speed-btn{font-family:var(--mono);font-size:11px;padding:4px 10px;border-radius:5px;border:1px solid var(--border2);background:none;color:var(--dim);cursor:pointer;transition:all .15s}
+.speed-btn.active,.speed-btn:hover{border-color:var(--teal);color:var(--teal)}
+
+/* ══════ MAIN STAGE ══════ */
+.stage{display:grid;grid-template-columns:260px 1fr 300px;height:100%;overflow:hidden}
+
+/* ══════ LEFT: PIPELINE NAV ══════ */
+.pipeline-nav{border-right:1px solid var(--border);overflow-y:auto;padding:16px 0;scrollbar-width:none}
+.pipeline-nav::-webkit-scrollbar{display:none}
+.nav-group-label{font-family:var(--mono);font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);padding:12px 20px 6px;display:flex;align-items:center;gap:8px}
+.nav-group-label::after{content:'';flex:1;height:1px;background:var(--border)}
+.nav-item{display:flex;align-items:center;gap:12px;padding:9px 20px;cursor:pointer;transition:all .15s;position:relative;border-left:2px solid transparent}
+.nav-item:hover{background:rgba(255,255,255,.03)}
+.nav-item.active{background:rgba(0,229,184,.05);border-left-color:var(--step-c,var(--teal))}
+.nav-dot{width:24px;height:24px;border-radius:50%;border:1.5px solid rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:9px;color:var(--muted);flex-shrink:0;transition:all .2s}
+.nav-item.active .nav-dot{background:var(--step-c,var(--teal));border-color:var(--step-c,var(--teal));color:#000;font-weight:600}
+.nav-item.done .nav-dot{background:rgba(0,229,184,.15);border-color:rgba(0,229,184,.3);color:var(--teal)}
+.nav-item.done .nav-dot::after{content:'✓';font-size:10px}
+.nav-item.done .nav-dot span{display:none}
+.nav-text{flex:1;min-width:0}
+.nav-title{font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nav-sub{font-size:10px;color:var(--muted);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nav-connector{width:1px;height:10px;background:var(--border2);margin:1px 0 1px 31px}
+
+/* ══════ CENTER: MAIN CONTENT ══════ */
+.main-content{overflow-y:auto;padding:32px 36px;scrollbar-width:thin;scrollbar-color:var(--border2) transparent}
+.scene{display:none;opacity:0;transform:translateY(12px);transition:opacity .4s ease,transform .4s ease}
+.scene.active{display:block;opacity:1;transform:none}
+
+.scene-header{margin-bottom:28px}
+.scene-phase{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;margin-bottom:8px;display:flex;align-items:center;gap:8px}
+.phase-pill{padding:3px 10px;border-radius:20px;font-size:10px;border:1px solid;font-family:var(--mono);letter-spacing:.06em}
+.scene-title{font-size:22px;font-weight:700;letter-spacing:-.03em;line-height:1.2;margin-bottom:8px}
+.scene-desc{font-size:13px;color:var(--dim);line-height:1.6;max-width:540px}
+
+/* DATA FLOW CARD */
+.flow-card{background:var(--card);border:1px solid var(--border2);border-radius:14px;overflow:hidden;margin-bottom:20px}
+.flow-card-header{padding:12px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:var(--card2)}
+.flow-card-label{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);display:flex;align-items:center;gap:6px}
+.dot-in{width:7px;height:7px;border-radius:50%;background:var(--muted)}
+.dot-out{width:7px;height:7px;border-radius:50%;background:var(--teal)}
+.dot-kg{background:var(--amber)}
+.dot-red{background:var(--red)}
+.flow-card-body{padding:16px 18px;font-family:var(--mono);font-size:12px;line-height:1.85}
+
+/* TRANSFORM ARROW */
+.transform-row{display:flex;align-items:center;gap:12px;margin:12px 0;padding:0 18px}
+.transform-line{flex:1;height:1px;background:linear-gradient(to right,transparent,var(--border2),transparent)}
+.transform-badge{display:flex;align-items:center;gap:8px;padding:6px 16px;border-radius:20px;font-family:var(--mono);font-size:11px;white-space:nowrap;border:1px solid}
+.t-arrow-svg{flex-shrink:0}
+
+/* TOKENS (NER highlighting) */
+.tok{display:inline-block;padding:1px 5px;border-radius:4px;font-weight:500;margin:0 1px}
+.tok-drug{background:rgba(77,166,255,.18);color:var(--blue)}
+.tok-sym{background:rgba(255,179,71,.18);color:var(--amber)}
+.tok-dose{background:rgba(167,139,250,.18);color:var(--purple)}
+.tok-time{background:rgba(0,229,184,.15);color:var(--teal)}
+.tok-intent{background:rgba(255,107,107,.18);color:var(--red)}
+
+/* CODE LINES */
+.cl{display:block;padding:1px 0;transition:all .3s}
+.cl.fade-in{animation:lineFadeIn .3s ease both}
+@keyframes lineFadeIn{from{opacity:0;transform:translateX(-8px)}to{opacity:1;transform:none}}
+.cl.hi-add{color:var(--teal);background:rgba(0,229,184,.07);border-radius:3px;padding:1px 5px}
+.cl.hi-del{color:var(--red);text-decoration:line-through;opacity:.55}
+.cl.hi-warn{color:var(--amber)}
+.cl.hi-dim{color:var(--muted)}
+.cl .k{color:var(--blue)}
+.cl .v{color:var(--teal)}
+.cl .w{color:var(--amber)}
+.cl .r{color:var(--red)}
+.cl .p{color:var(--purple)}
+.cl .d{color:var(--muted)}
+
+/* DUAL PANEL (before/after side by side) */
+.dual{display:grid;grid-template-columns:1fr auto 1fr;gap:0;margin-bottom:20px;align-items:start}
+.dual-arrow{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 12px;padding-top:36px;gap:4px}
+.dual-arrow svg{opacity:.4}
+.dual-arrow span{font-family:var(--mono);font-size:9px;color:var(--muted);writing-mode:vertical-rl;transform:rotate(180deg);letter-spacing:.08em}
+
+/* KG GRAPH MINI */
+.kg-viz{background:var(--card);border:1px solid var(--border2);border-radius:14px;padding:20px;margin-bottom:20px}
+.kg-node{display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:20px;font-family:var(--mono);font-size:11px;font-weight:500;border:1px solid;margin:4px}
+.kg-node.drug{background:rgba(77,166,255,.1);border-color:rgba(77,166,255,.3);color:var(--blue)}
+.kg-node.effect{background:rgba(255,179,71,.1);border-color:rgba(255,179,71,.3);color:var(--amber)}
+.kg-node.severity{background:rgba(255,107,107,.1);border-color:rgba(255,107,107,.3);color:var(--red)}
+.kg-node.guideline{background:rgba(0,229,184,.08);border-color:rgba(0,229,184,.2);color:var(--teal)}
+.kg-edge{font-family:var(--mono);font-size:10px;color:var(--muted);padding:2px 8px;display:inline-flex;align-items:center;gap:4px}
+.kg-edge::before,.kg-edge::after{content:'—';opacity:.4}
+.kg-row{display:flex;align-items:center;flex-wrap:wrap;gap:4px;margin:6px 0}
+
+/* SCORES */
+.scores-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px}
+.score-card{background:var(--card);border:1px solid var(--border2);border-radius:10px;padding:14px;text-align:center}
+.score-val{font-family:var(--mono);font-size:22px;font-weight:700;margin-bottom:4px}
+.score-lbl{font-size:11px;color:var(--muted);letter-spacing:.04em}
+.score-bar{height:3px;border-radius:2px;margin-top:10px;overflow:hidden;background:var(--border2)}
+.score-fill{height:100%;border-radius:2px;transition:width 1.2s ease}
+
+/* DIALOGUE BLOCK */
+.dialogue{display:flex;flex-direction:column;gap:10px;margin-bottom:20px}
+.msg{display:flex;gap:10px;align-items:flex-start}
+.msg.doc{flex-direction:row-reverse}
+.msg-avatar{width:28px;height:28px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600}
+.msg.pat .msg-avatar{background:rgba(77,166,255,.2);color:var(--blue);border:1px solid rgba(77,166,255,.3)}
+.msg.doc .msg-avatar{background:rgba(0,229,184,.15);color:var(--teal);border:1px solid rgba(0,229,184,.3)}
+.msg-bubble{max-width:80%;padding:9px 14px;border-radius:12px;font-size:12.5px;line-height:1.55}
+.msg.pat .msg-bubble{background:rgba(77,166,255,.08);border:1px solid rgba(77,166,255,.15);border-radius:4px 12px 12px 12px}
+.msg.doc .msg-bubble{background:rgba(0,229,184,.06);border:1px solid rgba(0,229,184,.12);border-radius:12px 4px 12px 12px}
+.msg-role{font-family:var(--mono);font-size:9px;letter-spacing:.08em;text-transform:uppercase;margin-bottom:3px}
+.msg.pat .msg-role{color:var(--blue)}
+.msg.doc .msg-role{color:var(--teal)}
+
+/* FINAL RESPONSE */
+.cdss-response{background:linear-gradient(135deg,rgba(0,229,184,.04) 0%,rgba(77,166,255,.04) 100%);border:1px solid rgba(0,229,184,.2);border-radius:14px;padding:20px;margin-bottom:20px}
+.cdss-response-header{display:flex;align-items:center;gap:8px;margin-bottom:16px}
+.cdss-badge{font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;padding:3px 10px;border-radius:4px;background:rgba(0,229,184,.12);border:1px solid rgba(0,229,184,.3);color:var(--teal)}
+.cdss-field{margin-bottom:10px}
+.cdss-field-label{font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:4px}
+.cdss-field-val{font-size:13px;line-height:1.5}
+.alert-box{background:rgba(255,179,71,.07);border:1px solid rgba(255,179,71,.25);border-radius:8px;padding:10px 14px;font-size:12.5px;color:var(--amber);margin-top:6px;display:flex;gap:8px;align-items:flex-start}
+
+/* ══════ RIGHT: LIVE DATA TRACKER ══════ */
+.right-panel{border-left:1px solid var(--border);overflow-y:auto;scrollbar-width:none;padding:16px}
+.right-panel::-webkit-scrollbar{display:none}
+.rp-title{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)}
+.data-obj{margin-bottom:14px}
+.data-obj-label{font-family:var(--mono);font-size:10px;color:var(--muted);margin-bottom:5px;display:flex;align-items:center;gap:5px}
+.data-obj-label::before{content:'';width:6px;height:6px;border-radius:2px;background:currentColor;opacity:.4}
+.data-field{display:flex;gap:8px;align-items:baseline;padding:4px 0;border-bottom:1px solid var(--border);font-size:11.5px}
+.data-field:last-child{border-bottom:none}
+.df-key{font-family:var(--mono);color:var(--muted);flex-shrink:0;min-width:80px;font-size:10.5px}
+.df-val{font-family:var(--mono);color:var(--dim);word-break:break-all;font-size:10.5px;transition:color .3s}
+.df-val.new{color:var(--teal);animation:flashNew .6s ease}
+@keyframes flashNew{0%{background:rgba(0,229,184,.2)}100%{background:transparent}}
+.df-val.warn-val{color:var(--amber)}
+.df-val.empty{color:var(--border2);font-style:italic}
+
+/* ══════ BOTTOM CONTROLS ══════ */
+.controls{border-top:1px solid var(--border);background:rgba(6,9,18,.95);backdrop-filter:blur(12px);display:flex;flex-direction:column;justify-content:center;padding:0 28px;gap:8px}
+.progress-wrap{display:flex;align-items:center;gap:12px}
+.progress-bar{flex:1;height:3px;background:var(--border2);border-radius:2px;cursor:pointer;position:relative;overflow:hidden}
+.progress-fill{height:100%;background:linear-gradient(90deg,var(--teal),var(--blue));border-radius:2px;transition:width .4s ease}
+.progress-time{font-family:var(--mono);font-size:11px;color:var(--muted);white-space:nowrap}
+.ctrl-row{display:flex;align-items:center;justify-content:space-between}
+.ctrl-left{display:flex;align-items:center;gap:8px}
+.ctrl-btn{width:36px;height:36px;border-radius:50%;border:1px solid var(--border2);background:none;color:var(--dim);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s;flex-shrink:0}
+.ctrl-btn:hover{border-color:var(--teal);color:var(--teal)}
+.ctrl-btn.play{width:42px;height:42px;border-color:var(--teal);color:var(--teal);background:rgba(0,229,184,.08)}
+.ctrl-btn.play:hover{background:rgba(0,229,184,.15)}
+.ctrl-center{flex:1;text-align:center}
+.step-pills{display:flex;gap:5px;justify-content:center;flex-wrap:wrap}
+.step-pill{width:24px;height:4px;border-radius:2px;background:var(--border2);cursor:pointer;transition:all .2s}
+.step-pill.done{background:rgba(0,229,184,.4)}
+.step-pill.active{background:var(--teal);width:32px}
+.ctrl-right{display:flex;align-items:center;gap:8px}
+.autoplay-btn{font-family:var(--mono);font-size:11px;padding:6px 14px;border-radius:6px;border:1px solid var(--border2);background:none;color:var(--muted);cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:6px}
+.autoplay-btn.on{border-color:var(--teal);color:var(--teal);background:rgba(0,229,184,.06)}
+.autoplay-dot{width:6px;height:6px;border-radius:50%;background:currentColor}
+.autoplay-btn.on .autoplay-dot{animation:pulse 1.5s ease-in-out infinite}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- TOP BAR -->
+  <div class="topbar">
+    <div class="logo"><div class="logo-dot"></div>CDSS Pipeline Demo</div>
+    <div class="step-counter">Étape <span id="ctr-cur">1</span> / <span id="ctr-tot">10</span></div>
+    <div class="topbar-right">
+      <button class="speed-btn active" onclick="setSpeed(1)" id="s1">1×</button>
+      <button class="speed-btn" onclick="setSpeed(1.5)" id="s15">1.5×</button>
+      <button class="speed-btn" onclick="setSpeed(2)" id="s2">2×</button>
+    </div>
+  </div>
+
+  <!-- STAGE -->
+  <div class="stage">
+
+    <!-- LEFT PIPELINE NAV -->
+    <nav class="pipeline-nav" id="pipeNav"></nav>
+
+    <!-- CENTER CONTENT -->
+    <div class="main-content" id="mainContent"></div>
+
+    <!-- RIGHT DATA TRACKER -->
+    <div class="right-panel">
+      <div class="rp-title">État des données · live</div>
+      <div id="liveData"></div>
+    </div>
+
+  </div>
+
+  <!-- BOTTOM CONTROLS -->
+  <div class="controls">
+    <div class="progress-wrap">
+      <div class="progress-bar" id="progressBar" onclick="handleProgressClick(event)">
+        <div class="progress-fill" id="progressFill" style="width:0%"></div>
+      </div>
+      <div class="progress-time" id="progressTime">0:00</div>
+    </div>
+    <div class="ctrl-row">
+      <div class="ctrl-left">
+        <button class="ctrl-btn" onclick="go(-1)" title="Précédent">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polygon points="19 20 9 12 19 4 19 20"/><line x1="5" y1="19" x2="5" y2="5"/></svg>
+        </button>
+        <button class="ctrl-btn play" id="playBtn" onclick="togglePlay()">
+          <svg id="playIcon" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+        </button>
+        <button class="ctrl-btn" onclick="go(1)" title="Suivant">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" y1="5" x2="19" y2="19"/></svg>
+        </button>
+      </div>
+      <div class="ctrl-center"><div class="step-pills" id="stepPills"></div></div>
+      <div class="ctrl-right">
+        <button class="autoplay-btn" id="autoBtn" onclick="toggleAuto()"><div class="autoplay-dot"></div>Auto</button>
+        <button class="ctrl-btn" onclick="restart()" title="Recommencer">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.5"/></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ════════════════════════════════════════════
+// STEP DEFINITIONS
+// ════════════════════════════════════════════
+const STEPS = [
+  {
+    id:'input', group:'Entrée', num:'00', stepColor:'#a78bfa', label:'Transcript brut', sub:'Dialogue non structuré',
+    phase:'INPUT', phaseColor:'#a78bfa',
+    title:'Entrée : Transcript Patient ↔ Médecin',
+    desc:'Le système reçoit un bloc de texte brut issu d\'une consultation. Aucune structure, aucune annotation — juste le dialogue tel qu\'il s\'est déroulé.',
+    liveKey:'input',
+    render: () => `
+      <div class="scene-header">
+        <div class="scene-phase"><span class="phase-pill" style="color:#a78bfa;border-color:rgba(167,139,250,.3);background:rgba(167,139,250,.07)">INPUT · Transcript brut</span></div>
+        <div class="scene-title" style="color:#a78bfa">Transcript brut reçu</div>
+        <div class="scene-desc">Le système reçoit un bloc de texte non structuré issu d'une consultation médicale réelle.</div>
+      </div>
+      <div class="dialogue" id="dlg"></div>
+      <div class="flow-card">
+        <div class="flow-card-header"><span class="flow-card-label"><span class="dot-in" style="background:#a78bfa"></span>raw_input.txt</span></div>
+        <div class="flow-card-body"><span class="cl hi-dim">// Aucune structure · aucune annotation</span>
+<span class="cl">Patient:depuis 3j  nausées+diarrhées!!  </span>
+<span class="cl">Médecin:quel tt ?? Metf. 500mg 2x/j</span>
+<span class="cl">Pt:normal?? dois je  arréter</span></div>
+      </div>`,
+    anim: async (delay) => {
+      const msgs = [
+        {role:'pat',avatar:'P',label:'Patient',text:'Depuis 3 jours j\'ai des nausées et des diarrhées…'},
+        {role:'doc',avatar:'M',label:'Médecin',text:'Vous prenez quel traitement en ce moment ?'},
+        {role:'pat',avatar:'P',label:'Patient',text:'Metformine 500 mg, matin et soir.'},
+        {role:'doc',avatar:'M',label:'Médecin',text:'D\'accord. C\'est noté.'},
+        {role:'pat',avatar:'P',label:'Patient',text:'Est-ce que c\'est normal ? Est-ce que je dois arrêter ?'},
+      ];
+      const dlg = document.getElementById('dlg');
+      if (!dlg) return;
+      for (const m of msgs) {
+        await wait(delay(500));
+        const el = document.createElement('div');
+        el.className = `msg ${m.role}`;
+        el.innerHTML = `<div class="msg-avatar">${m.avatar}</div><div class="msg-bubble"><div class="msg-role">${m.label}</div>${m.text}</div>`;
+        el.style.opacity='0';el.style.transform='translateY(8px)';
+        dlg.appendChild(el);
+        requestAnimationFrame(()=>{el.style.transition='all .35s ease';el.style.opacity='1';el.style.transform='none'});
+        dlg.scrollTop = dlg.scrollHeight;
+      }
+    }
+  },
+  {
+    id:'step1', group:'Pré-traitement NLP', num:'01', stepColor:'#4da6ff', label:'Normalisation', sub:'Nettoyage · abréviations',
+    phase:'NLP',phaseColor:'#4da6ff',
+    title:'Étape 01 — Normalisation du discours',
+    desc:'Le système nettoie le texte brut : suppression des disfluences, normalisation des abréviations médicales, correction orthographique légère, préservation de l\'ordre chronologique.',
+    liveKey:'step1',
+    render: () => `
+      <div class="scene-header">
+        <div class="scene-phase"><span class="phase-pill" style="color:#4da6ff;border-color:rgba(77,166,255,.3);background:rgba(77,166,255,.07)">NLP · Étape 01</span></div>
+        <div class="scene-title" style="color:#4da6ff">Normalisation du discours</div>
+        <div class="scene-desc">Nettoyage du texte, normalisation des abréviations médicales, correction des espaces et encodages.</div>
+      </div>
+      <div class="dual">
+        <div class="flow-card" style="margin-bottom:0">
+          <div class="flow-card-header"><span class="flow-card-label"><span class="dot-in"></span>Avant</span></div>
+          <div class="flow-card-body" style="font-size:11.5px">
+<span class="cl hi-del">Patient:depuis 3j  nausées+diarrhées!!</span>
+<span class="cl hi-del">Médecin:quel tt ?? Metf. 500mg 2x/j</span>
+<span class="cl hi-del">Pt:normal?? dois je  arréter</span></div>
+        </div>
+        <div class="dual-arrow"><svg width="16" height="28" viewBox="0 0 16 28"><line x1="8" y1="2" x2="8" y2="20" stroke="white" stroke-width="1.5"/><path d="M3 15L8 21L13 15" fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round"/></svg><span>spaCy · regex</span></div>
+        <div class="flow-card" style="margin-bottom:0" id="out1">
+          <div class="flow-card-header"><span class="flow-card-label"><span class="dot-out"></span>Après</span></div>
+          <div class="flow-card-body" style="font-size:11.5px"></div>
+        </div>
+      </div>`,
+    anim: async (delay) => {
+      const lines = [
+        '<span class="cl hi-add fade-in">Patient: Depuis 3 jours, nausées et diarrhées.</span>',
+        '<span class="cl hi-add fade-in">Médecin: Quel traitement ? Metformine <span class="v">500 mg × 2/j</span>.</span>',
+        '<span class="cl hi-add fade-in">Patient: Est-ce normal ? Dois-je arrêter ?</span>',
+      ];
+      const body = document.querySelector('#out1 .flow-card-body');
+      if (!body) return;
+      for (const l of lines) { await wait(delay(600)); body.innerHTML += l; }
+    }
+  },
+  {
+    id:'step2', group:'Pré-traitement NLP', num:'02', stepColor:'#4da6ff', label:'Segmentation', sub:'Tours de parole · rôles',
+    phase:'NLP',phaseColor:'#4da6ff',
+    title:'Étape 02 — Segmentation par locuteur',
+    desc:'Chaque échange est découpé en "tours de parole" avec un rôle clinique assigné : patient ou médecin. Les tours sont numérotés et le contexte inter-tours est préservé.',
+    liveKey:'step2',
+    render: () => `
+      <div class="scene-header">
+        <div class="scene-phase"><span class="phase-pill" style="color:#4da6ff;border-color:rgba(77,166,255,.3);background:rgba(77,166,255,.07)">NLP · Étape 02</span></div>
+        <div class="scene-title" style="color:#4da6ff">Segmentation par locuteur</div>
+        <div class="scene-desc">Découpage en tours numérotés avec attribution du rôle clinique. Le contexte temporel est préservé entre les tours.</div>
+      </div>
+      <div class="flow-card">
+        <div class="flow-card-header"><span class="flow-card-label"><span class="dot-out"></span>turns[ ] — sortie segmentée</span></div>
+        <div class="flow-card-body" id="seg-out" style="font-size:11.5px"></div>
+      </div>`,
+    anim: async (delay) => {
+      const out = document.getElementById('seg-out'); if (!out) return;
+      const items = [
+        `<span class="cl hi-add fade-in">{ id: <span class="w">1</span>, role: <span class="v">"patient"</span>,  text: <span class="p">"Depuis 3 jours, nausées et diarrhées."</span> }</span>`,
+        `<span class="cl hi-add fade-in">{ id: <span class="w">2</span>, role: <span class="k">"medecin"</span>,  text: <span class="p">"Quel traitement ? Metformine 500 mg × 2/j."</span> }</span>`,
+        `<span class="cl hi-add fade-in">{ id: <span class="w">3</span>, role: <span class="v">"patient"</span>,  text: <span class="p">"Est-ce normal ? Dois-je arrêter ?"</span> }</span>`,
+      ];
+      for (const i of items) { await wait(delay(700)); out.innerHTML += i; }
+    }
+  },
+  {
+    id:'step3', group:'Pré-traitement NLP', num:'03', stepColor:'#4da6ff', label:'Extraction NER', sub:'Entités cliniques',
+    phase:'NLP',phaseColor:'#4da6ff',
+    title:'Étape 03 — Extraction clinique orientée rôle',
+    desc:'Le modèle NER médical identifie et catégorise les entités nommées dans chaque tour : médicaments, doses, symptômes, temporalités, intentions cliniques.',
+    liveKey:'step3',
+    render: () => `
+      <div class="scene-header">
+        <div class="scene-phase"><span class="phase-pill" style="color:#4da6ff;border-color:rgba(77,166,255,.3);background:rgba(77,166,255,.07)">NLP · Étape 03</span></div>
+        <div class="scene-title" style="color:#4da6ff">Extraction clinique — NER médical</div>
+        <div class="scene-desc">Le modèle BioBERT identifie les entités médicales dans chaque tour et les annote avec leur type sémantique.</div>
+      </div>
+      <div class="flow-card" style="margin-bottom:16px">
+        <div class="flow-card-header"><span class="flow-card-label"><span class="dot-in"></span>Texte annoté par le modèle NER</span></div>
+        <div class="flow-card-body" style="line-height:2.2;font-size:13px">
+          <div>"Depuis <span class="tok tok-time">3 jours</span>, <span class="tok tok-sym">nausées</span> et <span class="tok tok-sym">diarrhées</span>."</div>
+          <div>"<span class="tok tok-drug">Metformine</span> <span class="tok tok-dose">500 mg × 2/j</span>."</div>
+          <div>"Est-ce normal ? Dois-je <span class="tok tok-intent">arrêter</span> ?"</div>
+        </div>
+      </div>
+      <div class="flow-card">
+        <div class="flow-card-header"><span class="flow-card-label"><span class="dot-out"></span>entities[ ] extraites</span></div>
+        <div class="flow-card-body" id="ner-out" style="font-size:11.5px"></div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
+        <span class="tok tok-drug" style="font-size:11px">DRUG</span>
+        <span class="tok tok-dose" style="font-size:11px">DOSE</span>
+        <span class="tok tok-sym" style="font-size:11px">SYMPTOM</span>
+        <span class="tok tok-time" style="font-size:11px">ONSET</span>
+        <span class="tok tok-intent" style="font-size:11px">INTENT</span>
+      </div>`,
+    anim: async (delay) => {
+      const out = document.getElementById('ner-out'); if (!out) return;
+      const items = [
+        `<span class="cl hi-add fade-in">DRUG:    <span class="tok tok-drug" style="font-size:11px">Metformine</span>           <span class="d">[MEDICAMENT]</span></span>`,
+        `<span class="cl hi-add fade-in">DOSE:    <span class="tok tok-dose" style="font-size:11px">500 mg × 2/j</span>         <span class="d">[POSOLOGIE]</span></span>`,
+        `<span class="cl hi-add fade-in">SYMPTOM: <span class="tok tok-sym" style="font-size:11px">nausées</span>, <span class="tok tok-sym" style="font-size:11px">diarrhées</span>    <span class="d">[EI_DIGESTIF]</span></span>`,
+        `<span class="cl hi-add fade-in">ONSET:   <span class="tok tok-time" style="font-size:11px">3 jours</span>              <span class="d">[TEMPORALITE]</span></span>`,
+        `<span class="cl hi-add fade-in">INTENT:  <span class="tok tok-intent" style="font-size:11px">SAFETY_QUERY</span>         <span class="d">[DECISION_POINT]</span></span>`,
+      ];
+      for (const i of items) { await wait(delay(550)); out.innerHTML += i; }
+    }
+  },
+  {
+    id:'step4', group:'Requête', num:'04', stepColor:'#00e5b8', label:'Construction requête', sub:'Intent · entités · priorité',
+    phase:'QUERY',phaseColor:'#00e5b8',
+    title:'Étape 04 — Construction de la requête médicale',
+    desc:'Les entités extraites des tours patient et médecin sont fusionnées en une requête structurée unique, avec un intent normalisé, des entités INN et une priorité clinique.',
+    liveKey:'step4',
+    render: () => `
+      <div class="scene-header">
+        <div class="scene-phase"><span class="phase-pill" style="color:#00e5b8;border-color:rgba(0,229,184,.3);background:rgba(0,229,184,.07)">QUERY · Étape 04</span></div>
+        <div class="scene-title" style="color:#00e5b8">Construction requête médicale unifiée</div>
+        <div class="scene-desc">Fusion des entités patient + médecin en une requête structurée unique envoyée aux moteurs de retrieval.</div>
+      </div>
+      <div class="dual">
+        <div>
+          <div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-bottom:6px">Patient entities</div>
+          <div class="flow-card" style="margin-bottom:0">
+            <div class="flow-card-body" style="font-size:11px">
+<span class="cl"><span class="k">symptom</span>: nausées, diarrhées</span>
+<span class="cl"><span class="k">onset</span>: 3 jours</span>
+<span class="cl"><span class="k">intent</span>: SAFETY_QUERY</span></div>
+          </div>
+          <div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin:10px 0 6px">Médecin entities</div>
+          <div class="flow-card" style="margin-bottom:0">
+            <div class="flow-card-body" style="font-size:11px">
+<span class="cl"><span class="k">drug</span>: Metformine</span>
+<span class="cl"><span class="k">dose</span>: 500mg × 2/j</span>
+<span class="cl"><span class="k">pathology</span>: T2DM</span></div>
+          </div>
+        </div>
+        <div class="dual-arrow"><svg width="16" height="28" viewBox="0 0 16 28"><line x1="8" y1="2" x2="8" y2="20" stroke="#00e5b8" stroke-width="1.5"/><path d="M3 15L8 21L13 15" fill="none" stroke="#00e5b8" stroke-width="1.5" stroke-linecap="round"/></svg><span>fusion</span></div>
+        <div class="flow-card" style="margin-bottom:0" id="q-out">
+          <div class="flow-card-header"><span class="flow-card-label"><span class="dot-out"></span>medical_query{ }</span></div>
+          <div class="flow-card-body" style="font-size:11.5px"></div>
+        </div>
+      </div>`,
+    anim: async (delay) => {
+      const body = document.querySelector('#q-out .flow-card-body'); if (!body) return;
+      const lines = [
+        `<span class="cl hi-add fade-in"><span class="k">intent</span>:    <span class="v">side_effects</span></span>`,
+        `<span class="cl hi-add fade-in"><span class="k">drug</span>:      <span class="v">Metformin</span> <span class="d">(INN·A10BA02)</span></span>`,
+        `<span class="cl hi-add fade-in"><span class="k">symptoms</span>: [<span class="w">nausea</span>, <span class="w">diarrhea</span>]</span>`,
+        `<span class="cl hi-add fade-in"><span class="k">priority</span>:  <span class="r">SAFETY_DECISION</span></span>`,
+        `<span class="cl hi-add fade-in"><span class="k">context</span>:   T2DM · début traitement</span>`,
+      ];
+      for (const l of lines) { await wait(delay(600)); body.innerHTML += l; }
+    }
+  },
+  {
+    id:'step5a', group:'Retrieval hybride', num:'05a', stepColor:'#ffb347', label:'Knowledge Graph', sub:'Faits structurés · VIDAL',
+    phase:'RETRIEVAL',phaseColor:'#ffb347',
+    title:'Étape 05a — Knowledge Graph (KG)',
+    desc:'Le moteur interroge le graphe de connaissances médicales via une requête SPARQL. Il traverse les relations médicament → effets → fréquence et retourne des faits vérifiés avec sources.',
+    liveKey:'step5a',
+    render: () => `
+      <div class="scene-header">
+        <div class="scene-phase"><span class="phase-pill" style="color:#ffb347;border-color:rgba(255,179,71,.3);background:rgba(255,179,71,.07)">RETRIEVAL · Étape 05a</span></div>
+        <div class="scene-title" style="color:#ffb347">Knowledge Graph — Faits structurés</div>
+        <div class="scene-desc">Graph traversal : Metformin → effets indésirables → fréquence → sévérité. Sources : VIDAL, DrugBank, MedDRA.</div>
+      </div>
+      <div class="flow-card" style="margin-bottom:16px">
+        <div class="flow-card-header"><span class="flow-card-label"><span class="dot-in" style="background:var(--amber)"></span>Requête SPARQL / Cypher</span></div>
+        <div class="flow-card-body" style="font-size:11.5px">
+<span class="cl"><span class="k">MATCH</span> (d:Drug {inn:<span class="p">"Metformin"</span>})</span>
+<span class="cl">  -[:<span class="v">HAS_SIDE_EFFECT</span>]->(s:SideEffect)</span>
+<span class="cl"><span class="k">WHERE</span> s.system = <span class="p">"GI"</span></span>
+<span class="cl"><span class="k">RETURN</span> s.name, s.frequency, s.severity</span></div>
+      </div>
+      <div class="kg-viz" id="kg-viz"><div style="font-family:var(--mono);font-size:10px;color:var(--muted)">Traversal en cours…</div></div>
+      <div class="flow-card">
+        <div class="flow-card-header"><span class="flow-card-label"><span class="dot-out" style="background:var(--amber)"></span>kg_facts[ ] retournés</span></div>
+        <div class="flow-card-body" id="kg-out" style="font-size:11.5px"></div>
+      </div>`,
+    anim: async (delay) => {
+      await wait(delay(400));
+      const kg = document.getElementById('kg-viz');
+      if (kg) kg.innerHTML = `
+        <div class="kg-row"><span class="kg-node drug">💊 Metformin</span><span class="kg-edge">HAS_SIDE_EFFECT</span><span class="kg-node effect">🤢 Nausée</span><span class="kg-edge">frequency</span><span class="kg-node guideline">&gt;10% fréquent</span></div>
+        <div class="kg-row" style="margin-left:20px"><span class="kg-edge" style="margin-left:8px">↳</span><span class="kg-node effect">💩 Diarrhée</span><span class="kg-edge">frequency</span><span class="kg-node guideline">&gt;10% fréquent</span></div>
+        <div class="kg-row" style="margin-left:20px"><span class="kg-edge" style="margin-left:8px">↳</span><span class="kg-node severity">⚠ Acidose lactique</span><span class="kg-edge">frequency</span><span class="kg-node severity">&lt;0.01% très rare</span></div>`;
+      const out = document.getElementById('kg-out'); if (!out) return;
+      const items = [
+        `<span class="cl hi-add fade-in">nausée       <span class="k">freq</span>:<span class="v">&gt;10%</span>  <span class="k">sev</span>:légère  <span class="d">source:VIDAL</span></span>`,
+        `<span class="cl hi-add fade-in">diarrhée     <span class="k">freq</span>:<span class="v">&gt;10%</span>  <span class="k">sev</span>:légère  <span class="d">source:MedDRA</span></span>`,
+        `<span class="cl hi-add fade-in">acidose lact <span class="k">freq</span>:<span class="r">&lt;0.01%</span> <span class="k">sev</span>:<span class="r">GRAVE</span>   <span class="d">source:VIDAL</span></span>`,
+      ];
+      for (const i of items) { await wait(delay(700)); out.innerHTML += i; }
+    }
+  },
+  {
+    id:'step5b', group:'Retrieval hybride', num:'05b', stepColor:'#ffb347', label:'Vector Store (RAG)', sub:'Passages sémantiques',
+    phase:'RETRIEVAL',phaseColor:'#ffb347',
+    title:'Étape 05b — Vector Store (RAG sémantique)',
+    desc:'La requête est encodée en vecteur dense (BioBERT). Une recherche ANN retrouve les k passages les plus similaires dans le vector store : RCP, guidelines HAS, cas cliniques.',
+    liveKey:'step5b',
+    render: () => `
+      <div class="scene-header">
+        <div class="scene-phase"><span class="phase-pill" style="color:#ffb347;border-color:rgba(255,179,71,.3);background:rgba(255,179,71,.07)">RETRIEVAL · Étape 05b</span></div>
+        <div class="scene-title" style="color:#ffb347">Vector Store — Retrieval sémantique (RAG)</div>
+        <div class="scene-desc">Embedding de la requête → recherche ANN dans le vector store → top-k passages re-rankés par pertinence clinique.</div>
+      </div>
+      <div class="flow-card" style="margin-bottom:16px">
+        <div class="flow-card-header"><span class="flow-card-label"><span class="dot-in" style="background:var(--amber)"></span>Query embedding (BioBERT)</span></div>
+        <div class="flow-card-body" style="font-size:11.5px">
+<span class="cl"><span class="k">query</span> = <span class="p">"Metformin nausea diarrhea side effects safety"</span></span>
+<span class="cl"><span class="k">vector</span> = BioBERT.encode(query)  <span class="d">→ 768 dims</span></span>
+<span class="cl"><span class="k">results</span> = faiss.search(vector, k=<span class="v">5</span>)</span></div>
+      </div>
+      <div class="flow-card">
+        <div class="flow-card-header"><span class="flow-card-label"><span class="dot-out" style="background:var(--amber)"></span>Top passages retournés (cosine sim)</span></div>
+        <div class="flow-card-body" id="vec-out" style="font-size:11.5px"></div>
+      </div>`,
+    anim: async (delay) => {
+      const out = document.getElementById('vec-out'); if (!out) return;
+      const items = [
+        `<span class="cl hi-add fade-in"><span class="v">[0.94]</span> <span class="k">RCP Metf §4.8</span> — troubles digestifs fréquents en début de traitement...</span>`,
+        `<span class="cl hi-add fade-in"><span class="v">[0.88]</span> <span class="k">HAS 2023</span> — prise au cours du repas réduit les effets digestifs de ~40%...</span>`,
+        `<span class="cl hi-add fade-in"><span class="v">[0.81]</span> <span class="k">Case report</span> — T2DM + Metformin : tolérance GI améliorée après 6 semaines...</span>`,
+        `<span class="cl hi-add fade-in"><span class="w">[0.73]</span> <span class="k">EMA SmPC</span> — nausea/diarrhea most common AEs, usually transient...</span>`,
+      ];
+      for (const i of items) { await wait(delay(700)); out.innerHTML += i; }
+    }
+  },
+  {
+    id:'step6', group:'Synthèse', num:'06', stepColor:'#00e5b8', label:'Fusion contextuelle', sub:'KG + Vector + Contexte',
+    phase:'FUSION',phaseColor:'#00e5b8',
+    title:'Étape 06 — Fusion contextuelle',
+    desc:'Les trois sources sont agrégées en un contexte augmenté unique : le contexte conversationnel, les faits KG vérifiés et les passages vectoriels. Les conflits sont résolus (KG > Vector).',
+    liveKey:'step6',
+    render: () => `
+      <div class="scene-header">
+        <div class="scene-phase"><span class="phase-pill" style="color:#00e5b8;border-color:rgba(0,229,184,.3);background:rgba(0,229,184,.07)">FUSION · Étape 06</span></div>
+        <div class="scene-title" style="color:#00e5b8">Fusion contextuelle</div>
+        <div class="scene-desc">Agrégation des trois sources avec résolution de conflits. Construction du prompt augmenté final pour le LLM.</div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:16px">
+        <div class="flow-card" style="margin-bottom:0"><div class="flow-card-header"><span class="flow-card-label" style="font-size:9px"><span class="dot-in"></span>CONTEXT</span></div><div class="flow-card-body" style="font-size:10.5px"><span class="cl">intent: side_effects</span><span class="cl">drug: Metformin</span><span class="cl">priority: SAFETY</span></div></div>
+        <div class="flow-card" style="margin-bottom:0"><div class="flow-card-header"><span class="flow-card-label" style="font-size:9px"><span class="dot-in" style="background:var(--amber)"></span>KG FACTS</span></div><div class="flow-card-body" style="font-size:10.5px"><span class="cl">nausée: fréq &gt;10%</span><span class="cl">diarrhée: fréq &gt;10%</span><span class="cl">acidose: très rare</span></div></div>
+        <div class="flow-card" style="margin-bottom:0"><div class="flow-card-header"><span class="flow-card-label" style="font-size:9px"><span class="dot-in" style="background:var(--amber)"></span>VECTOR</span></div><div class="flow-card-body" style="font-size:10.5px"><span class="cl">"prise au repas...</span><span class="cl"> réduit effets GI"</span><span class="cl">sim: 0.94</span></div></div>
+      </div>
+      <div class="flow-card">
+        <div class="flow-card-header"><span class="flow-card-label"><span class="dot-out"></span>Contexte augmenté → LLM prompt</span></div>
+        <div class="flow-card-body" id="fus-out" style="font-size:11.5px"></div>
+      </div>`,
+    anim: async (delay) => {
+      const out = document.getElementById('fus-out'); if (!out) return;
+      const lines = [
+        `<span class="cl hi-add fade-in"><span class="k">CONTEXT</span>: Metformin 500mg BID, T2DM, 3j symptoms</span>`,
+        `<span class="cl hi-add fade-in"><span class="k">FACTS</span>[KG]: nausea/diarrhea <span class="v">freq&gt;10%</span>, lactic acidosis <span class="w">very rare</span></span>`,
+        `<span class="cl hi-add fade-in"><span class="k">EVIDENCE</span>: <span class="p">"take with food reduces GI effects ~40%"</span></span>`,
+        `<span class="cl hi-add fade-in"><span class="k">QUERY</span>: safe to continue? alert thresholds?</span>`,
+      ];
+      for (const l of lines) { await wait(delay(700)); out.innerHTML += l; }
+    }
+  },
+  {
+    id:'step7', group:'Génération', num:'07', stepColor:'#ff6b6b', label:'Génération CDSS', sub:'LLM → réponse structurée',
+    phase:'GENERATION',phaseColor:'#ff6b6b',
+    title:'Étape 07 — Génération réponse CDSS',
+    desc:'Le LLM génère une réponse structurée orientée aide à la décision : synthèse clinique, points de vigilance, action recommandée. Chaque élément est sourcé depuis le contexte augmenté.',
+    liveKey:'step7',
+    render: () => `
+      <div class="scene-header">
+        <div class="scene-phase"><span class="phase-pill" style="color:#ff6b6b;border-color:rgba(255,107,107,.3);background:rgba(255,107,107,.07)">GENERATION · Étape 07</span></div>
+        <div class="scene-title" style="color:#ff6b6b">Génération réponse CDSS</div>
+        <div class="scene-desc">Le LLM génère une réponse structurée, factuelle et actionnelle à partir du contexte augmenté fusionné.</div>
+      </div>
+      <div class="flow-card" style="margin-bottom:16px">
+        <div class="flow-card-header"><span class="flow-card-label"><span class="dot-in"></span>Prompt augmenté → LLM (GPT-4 / Mistral-Med)</span></div>
+        <div class="flow-card-body" style="font-size:11px;color:var(--muted)">
+          <span class="cl">Tu es un système CDSS. Génère une réponse structurée</span>
+          <span class="cl">à partir du contexte clinique fourni. Format JSON strict.</span>
+          <span class="cl">Ne jamais inventer. Ne jamais substituer au clinicien.</span>
+        </div>
+      </div>
+      <div class="cdss-response">
+        <div class="cdss-response-header"><span class="cdss-badge">CDSS Response</span><span style="font-family:var(--mono);font-size:10px;color:var(--muted)" id="gen-status">Génération…</span></div>
+        <div id="gen-out"></div>
+      </div>`,
+    anim: async (delay) => {
+      const out = document.getElementById('gen-out');
+      const status = document.getElementById('gen-status');
+      if (!out || !status) return;
+      const fields = [
+        {label:'synthese', val:'Effets digestifs fréquents (>10%) en début de traitement par Metformine.', cls:''},
+        {label:'action', val:'Prendre la Metformine systématiquement en cours de repas.', cls:''},
+        {label:'vigilance', val:'ALERTE : Douleurs abdominales intenses, vomissements, déshydratation → consulter.', cls:'warn-val', alert:true},
+        {label:'decision', val:'Ne PAS arrêter la Metformine sans avis médical.', cls:''},
+        {label:'suivi', val:'Réévaluation dans 4 semaines.', cls:''},
+      ];
+      let i = 0;
+      for (const f of fields) {
+        await wait(delay(700));
+        if (status) status.textContent = `Génération… (${++i}/${fields.length})`;
+        const div = document.createElement('div');
+        div.className = 'cdss-field';
+        div.style.opacity='0';div.style.transform='translateY(6px)';
+        div.innerHTML = `<div class="cdss-field-label">${f.label}</div>${f.alert?`<div class="alert-box"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>${f.val}</div>`:`<div class="cdss-field-val ${f.cls}">${f.val}</div>`}`;
+        out.appendChild(div);
+        requestAnimationFrame(()=>{div.style.transition='all .35s ease';div.style.opacity='1';div.style.transform='none'});
+      }
+      if (status) status.textContent = '✓ Complété';
+    }
+  },
+  {
+    id:'step8', group:'Safety', num:'08', stepColor:'#ff6b6b', label:'Safety & Validation', sub:'Score · disclaimer · audit',
+    phase:'SAFETY',phaseColor:'#ff6b6b',
+    title:'Étape 08 — Safety & Validation clinique',
+    desc:'Couche de sécurité obligatoire : calcul du score de confiance, détection du risque d\'hallucination (vérification croisée KG), ajout du disclaimer clinique réglementaire, génération de l\'audit trail.',
+    liveKey:'step8',
+    render: () => `
+      <div class="scene-header">
+        <div class="scene-phase"><span class="phase-pill" style="color:#ff6b6b;border-color:rgba(255,107,107,.3);background:rgba(255,107,107,.07)">SAFETY · Étape 08</span></div>
+        <div class="scene-title" style="color:#ff6b6b">Safety & Validation clinique</div>
+        <div class="scene-desc">Vérification de chaque claim contre le KG, scoring de confiance, ajout du disclaimer réglementaire obligatoire.</div>
+      </div>
+      <div class="scores-grid">
+        <div class="score-card"><div class="score-val" style="color:var(--teal)" id="sc-conf">—</div><div class="score-lbl">Confiance</div><div class="score-bar"><div class="score-fill" id="sf-conf" style="width:0%;background:var(--teal)"></div></div></div>
+        <div class="score-card"><div class="score-val" style="color:var(--teal)" id="sc-hall">—</div><div class="score-lbl">Risque hallucination</div><div class="score-bar"><div class="score-fill" id="sf-hall" style="width:0%;background:var(--teal)"></div></div></div>
+        <div class="score-card"><div class="score-val" style="color:var(--blue)" id="sc-src">—</div><div class="score-lbl">Sources citées</div><div class="score-bar"><div class="score-fill" id="sf-src" style="width:0%;background:var(--blue)"></div></div></div>
+      </div>
+      <div class="flow-card">
+        <div class="flow-card-header"><span class="flow-card-label"><span class="dot-out" style="background:var(--red)"></span>validated_output{ }</span></div>
+        <div class="flow-card-body" id="safety-out" style="font-size:11.5px"></div>
+      </div>`,
+    anim: async (delay) => {
+      await wait(delay(400));
+      const setScore = (id, fill, val, pct) => {
+        const el = document.getElementById(id); if (el) el.textContent = val;
+        const bar = document.getElementById(fill); if (bar) bar.style.width = pct+'%';
+      };
+      setScore('sc-conf','sf-conf','0.91','91');
+      await wait(delay(400)); setScore('sc-hall','sf-hall','LOW','18');
+      await wait(delay(400)); setScore('sc-src','sf-src','2','100');
+      const out = document.getElementById('safety-out'); if (!out) return;
+      const lines = [
+        `<span class="cl hi-add fade-in"><span class="k">confidence</span>:    <span class="v">0.91</span></span>`,
+        `<span class="cl hi-add fade-in"><span class="k">halluci_risk</span>: <span class="v">LOW</span>  <span class="d">(all claims sourced in KG)</span></span>`,
+        `<span class="cl hi-add fade-in"><span class="k">sources</span>:       [<span class="p">"VIDAL 2024"</span>, <span class="p">"RCP Metformine"</span>]</span>`,
+        `<span class="cl hi-add fade-in"><span class="k">disclaimer</span>:   <span class="p">"Aide à la décision — validation clinique requise"</span></span>`,
+        `<span class="cl hi-add fade-in"><span class="k">audit_id</span>:     <span class="d">uuid-4f2a-8c1d-bb3e</span></span>`,
+      ];
+      for (const l of lines) { await wait(delay(550)); out.innerHTML += l; }
+    }
+  },
+  {
+    id:'output', group:'Sortie CDSS', num:'✓', stepColor:'#00e5b8', label:'Réponse finale', sub:'Aide à la décision clinique',
+    phase:'OUTPUT',phaseColor:'#00e5b8',
+    title:'Sortie — Réponse CDSS finale',
+    desc:'La réponse complète est prête : synthèse clinique, vigilance, action, metadata de sécurité. Disponible en JSON structuré, FHIR R4, ou via webhook HL7 pour intégration dans le SIH.',
+    liveKey:'output',
+    render: () => `
+      <div class="scene-header">
+        <div class="scene-phase"><span class="phase-pill" style="color:#00e5b8;border-color:rgba(0,229,184,.3);background:rgba(0,229,184,.07)">OUTPUT · Réponse finale</span></div>
+        <div class="scene-title" style="color:#00e5b8">Réponse CDSS validée</div>
+        <div class="scene-desc">Pipeline complet exécuté. Réponse structurée, sourcée et sécurisée prête pour intégration dans le SIH.</div>
+      </div>
+      <div class="cdss-response" style="border-color:rgba(0,229,184,.35)">
+        <div class="cdss-response-header"><span class="cdss-badge">✓ CDSS Final Output</span><span style="font-family:var(--mono);font-size:10px;color:var(--teal)">Confidence: 0.91</span></div>
+        <div class="cdss-field"><div class="cdss-field-label">synthese</div><div class="cdss-field-val">Effets digestifs fréquents (&gt;10%) en début de Metformine — transitoires, attendus.</div></div>
+        <div class="cdss-field"><div class="cdss-field-label">action</div><div class="cdss-field-val">Prendre systématiquement en cours de repas. Adapter à la dose minimale efficace.</div></div>
+        <div class="cdss-field"><div class="cdss-field-label">vigilance</div><div class="alert-box"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>Douleurs abdominales intenses · vomissements · déshydratation → consulter</div></div>
+        <div class="cdss-field"><div class="cdss-field-label">decision</div><div class="cdss-field-val" style="color:var(--teal);font-weight:500">Ne PAS arrêter la Metformine sans avis médical.</div></div>
+        <div class="cdss-field"><div class="cdss-field-label">suivi</div><div class="cdss-field-val">Réévaluation dans 4 semaines.</div></div>
+      </div>
+      <div class="flow-card">
+        <div class="flow-card-header"><span class="flow-card-label"><span class="dot-out"></span>Formats de sortie disponibles</span></div>
+        <div class="flow-card-body" style="display:flex;flex-wrap:wrap;gap:8px;font-family:var(--font)">
+          <span class="kg-node guideline">JSON structuré</span><span class="kg-node guideline">FHIR R4</span><span class="kg-node guideline">API REST</span><span class="kg-node guideline">HL7 v2</span><span class="kg-node guideline">Webhook</span>
+        </div>
+      </div>`,
+    anim: async () => {}
+  }
+];
+
+// ════════════════════════════════════════════
+// LIVE DATA STATE
+// ════════════════════════════════════════════
+const LIVE_STATE = {
+  input:   [{k:'raw_text',v:'[en attente]',e:true},{k:'format',v:'[en attente]',e:true},{k:'lines',v:'[en attente]',e:true}],
+  step1:   [{k:'cleaned',v:''},{k:'abbr_norm',v:''},{k:'lang',v:''}],
+  step2:   [{k:'turns',v:''},{k:'roles',v:''},{k:'context',v:''}],
+  step3:   [{k:'DRUG',v:''},{k:'DOSE',v:''},{k:'SYMPTOM',v:''},{k:'ONSET',v:''},{k:'INTENT',v:''}],
+  step4:   [{k:'intent',v:''},{k:'drug_INN',v:''},{k:'priority',v:''},{k:'context',v:''}],
+  step5a:  [{k:'kg_hits',v:''},{k:'top_fact',v:''},{k:'source',v:''}],
+  step5b:  [{k:'vec_hits',v:''},{k:'top_sim',v:''},{k:'corpus',v:''}],
+  step6:   [{k:'ctx_tokens',v:''},{k:'kg_merged',v:''},{k:'vec_merged',v:''}],
+  step7:   [{k:'synthese',v:''},{k:'action',v:''},{k:'vigilance',v:''}],
+  step8:   [{k:'confidence',v:''},{k:'halluc_risk',v:''},{k:'sources',v:''}],
+  output:  [{k:'status',v:''},{k:'format',v:''},{k:'audit_id',v:''}]
+};
+const LIVE_VALS = {
+  input:   [{v:'dialogue médical',e:false},{v:'Patient ↔ Médecin',e:false},{v:'5 lignes',e:false}],
+  step1:   [{v:'✓ nettoyé'},{v:'Metf.→Metformine'},{v:'FR détecté'}],
+  step2:   [{v:'3 turns'},{v:'patient, medecin'},{v:'préservé'}],
+  step3:   [{v:'Metformine'},{v:'500mg×2/j'},{v:'nausées,diarrhées'},{v:'3 jours'},{v:'SAFETY_QUERY'}],
+  step4:   [{v:'side_effects'},{v:'Metformin (A10BA02)'},{v:'SAFETY_DECISION'},{v:'T2DM·début traitement'}],
+  step5a:  [{v:'3 faits KG'},{v:'nausée >10%'},{v:'VIDAL·MedDRA'}],
+  step5b:  [{v:'4 passages'},{v:'sim=0.94'},{v:'RCP·HAS·Cases'}],
+  step6:   [{v:'1,240 tokens'},{v:'3 facts merged'},{v:'2 passages merged'}],
+  step7:   [{v:'effets GI fréquents'},{v:'prise au repas'},{v:'douleurs intenses'}],
+  step8:   [{v:'0.91'},{v:'LOW'},{v:'VIDAL·RCP'}],
+  output:  [{v:'✓ validated'},{v:'JSON·FHIR·HL7'},{v:'uuid-4f2a...'}]
+};
+
+// ════════════════════════════════════════════
+// PLAYER
+// ════════════════════════════════════════════
+let cur = 0, playing = false, autoPlay = false, timer = null, speedMult = 1, elapsed = 0, tickTimer = null;
+
+const wait = (ms) => new Promise(r => setTimeout(r, Math.max(ms, 80)));
+
+function setSpeed(s) {
+  speedMult = s;
+  document.querySelectorAll('.speed-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('s'+String(s).replace('.',''))?.classList.add('active');
+}
+
+function delay(ms) { return () => ms / speedMult; }
+
+async function goTo(idx) {
+  if (idx < 0 || idx >= STEPS.length) return;
+  cur = idx;
+  const s = STEPS[cur];
+
+  // Update nav
+  document.querySelectorAll('.nav-item').forEach((el,i) => {
+    el.classList.toggle('active', i===cur);
+    el.classList.toggle('done', i<cur);
+  });
+
+  // Update counter
+  document.getElementById('ctr-cur').textContent = cur+1;
+
+  // Render content
+  const mc = document.getElementById('mainContent');
+  mc.querySelectorAll('.scene').forEach(e=>e.classList.remove('active'));
+  let scene = mc.querySelector(`[data-sid="${s.id}"]`);
+  if (!scene) {
+    scene = document.createElement('div');
+    scene.className = 'scene';
+    scene.dataset.sid = s.id;
+    scene.innerHTML = s.render();
+    mc.appendChild(scene);
+  }
+  requestAnimationFrame(()=>scene.classList.add('active'));
+  mc.scrollTop = 0;
+
+  // Update live data
+  updateLiveData(s.liveKey, cur);
+
+  // Update pills and progress
+  updatePills();
+  updateProgress();
+
+  // Run animation
+  await s.anim(delay);
+}
+
+function updateLiveData(key, stepIdx) {
+  const panel = document.getElementById('liveData');
+  if (!panel) return;
+  let html = '';
+  const keys = Object.keys(LIVE_STATE);
+  const visibleKeys = keys.slice(0, stepIdx+1);
+  for (const k of visibleKeys) {
+    const vals = LIVE_STATE[k];
+    const newVals = LIVE_VALS[k];
+    const stepDef = STEPS.find(s=>s.liveKey===k);
+    const isActive = k === key;
+    html += `<div class="data-obj"><div class="data-obj-label" style="color:${isActive?(stepDef?.stepColor||'var(--teal)'):'var(--muted)'}">${stepDef?.label||k}</div>`;
+    for (let i=0; i<vals.length; i++) {
+      const filled = newVals && newVals[i];
+      html += `<div class="data-field"><span class="df-key">${vals[i].k}</span><span class="df-val${isActive&&filled?' new':''}${vals[i].e?' empty':''}">${filled?(filled.e?'[en attente]':filled.v):vals[i].v||'—'}</span></div>`;
+    }
+    html += '</div>';
+  }
+  panel.innerHTML = html;
+}
+
+function updatePills() {
+  const pills = document.querySelectorAll('.step-pill');
+  pills.forEach((p,i)=>{
+    p.classList.toggle('active',i===cur);
+    p.classList.toggle('done',i<cur);
+  });
+}
+
+function updateProgress() {
+  const pct = (cur/(STEPS.length-1))*100;
+  document.getElementById('progressFill').style.width = pct+'%';
+  document.getElementById('progressTime').textContent = `${cur+1}/${STEPS.length}`;
+}
+
+function go(dir) {
+  stopAuto();
+  const next = cur + dir;
+  if (next>=0 && next<STEPS.length) goTo(next);
+}
+
+function togglePlay() {
+  playing = !playing;
+  const icon = document.getElementById('playIcon');
+  if (playing) {
+    icon.innerHTML = '<rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>';
+    autoPlay = true;
+    document.getElementById('autoBtn').classList.add('on');
+    startAutoPlay();
+  } else {
+    icon.innerHTML = '<polygon points="5 3 19 12 5 21 5 3"/>';
+    stopAuto();
+  }
+}
+
+function toggleAuto() {
+  autoPlay = !autoPlay;
+  document.getElementById('autoBtn').classList.toggle('on', autoPlay);
+  if (autoPlay) startAutoPlay();
+  else stopAuto();
+}
+
+function startAutoPlay() {
+  stopAuto();
+  const interval = (4000 / speedMult);
+  timer = setInterval(() => {
+    if (cur < STEPS.length-1) goTo(cur+1);
+    else { stopAuto(); playing=false; document.getElementById('playIcon').innerHTML='<polygon points="5 3 19 12 5 21 5 3"/>'; }
+  }, interval);
+}
+
+function stopAuto() {
+  if (timer) { clearInterval(timer); timer=null; }
+}
+
+function restart() {
+  stopAuto(); playing=false;
+  document.getElementById('playIcon').innerHTML='<polygon points="5 3 19 12 5 21 5 3"/>';
+  document.getElementById('autoBtn').classList.remove('on');
+  autoPlay=false;
+  // Clear rendered scenes
+  document.getElementById('mainContent').innerHTML='';
+  goTo(0);
+}
+
+function handleProgressClick(e) {
+  const bar = document.getElementById('progressBar');
+  const rect = bar.getBoundingClientRect();
+  const pct = (e.clientX - rect.left) / rect.width;
+  const idx = Math.round(pct * (STEPS.length-1));
+  stopAuto(); goTo(idx);
+}
+
+// ════════════════════════════════════════════
+// BUILD NAV + PILLS
+// ════════════════════════════════════════════
+function buildNav() {
+  const nav = document.getElementById('pipeNav');
+  let lastGroup = '';
+  STEPS.forEach((s, i) => {
+    if (s.group !== lastGroup) {
+      lastGroup = s.group;
+      nav.innerHTML += `<div class="nav-group-label">${s.group}</div>`;
+    }
+    nav.innerHTML += `<div class="nav-item" data-ni="${i}" style="--step-c:${s.stepColor}" onclick="go(${i-cur});stopAuto()">
+      <div class="nav-dot"><span>${s.num}</span></div>
+      <div class="nav-text"><div class="nav-title">${s.label}</div><div class="nav-sub">${s.sub}</div></div>
+    </div>`;
+    if (i < STEPS.length-1) nav.innerHTML += `<div class="nav-connector"></div>`;
+  });
+  // Fix click handlers
+  nav.querySelectorAll('.nav-item').forEach((el,i)=>el.onclick=()=>{stopAuto();playing=false;document.getElementById('playIcon').innerHTML='<polygon points="5 3 19 12 5 21 5 3"/>';goTo(i)});
+}
+
+function buildPills() {
+  const container = document.getElementById('stepPills');
+  STEPS.forEach((_,i)=>{
+    const p = document.createElement('div');
+    p.className = 'step-pill';
+    p.onclick = ()=>{stopAuto();goTo(i)};
+    container.appendChild(p);
+  });
+  document.getElementById('ctr-tot').textContent = STEPS.length;
+}
+
+// INIT
+buildNav();
+buildPills();
+goTo(0);
+</script>
+</body>
+</html>
