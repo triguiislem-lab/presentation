@@ -187,6 +187,60 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 .autoplay-btn.on{border-color:var(--teal);color:var(--teal);background:rgba(0,229,184,.06)}
 .autoplay-dot{width:6px;height:6px;border-radius:50%;background:currentColor}
 .autoplay-btn.on .autoplay-dot{animation:pulse 1.5s ease-in-out infinite}
+
+/* ══════ RESPONSIVE ══════ */
+@media (max-width:1100px){
+  .stage{grid-template-columns:220px 1fr}
+  .right-panel{display:none}
+}
+
+@media (max-width:860px){
+  html,body{overflow:auto}
+  .app{height:auto;min-height:100vh;grid-template-rows:auto 1fr auto}
+
+  .topbar{padding:10px 14px;gap:10px;flex-wrap:wrap;min-height:56px}
+  .topbar-right{width:100%;justify-content:flex-end}
+
+  .stage{display:flex;flex-direction:column;height:auto;overflow:visible}
+
+  .pipeline-nav{
+    border-right:none;
+    border-bottom:1px solid var(--border);
+    padding:10px 0;
+    display:flex;
+    overflow-x:auto;
+    overflow-y:hidden;
+    white-space:nowrap;
+  }
+  .nav-group-label,.nav-connector{display:none}
+  .nav-item{min-width:220px;padding:10px 12px;border-left:none;border-bottom:2px solid transparent}
+  .nav-item.active{border-left-color:transparent;border-bottom-color:var(--step-c,var(--teal))}
+
+  .main-content{padding:18px 14px}
+  .right-panel{display:block;border-left:none;border-top:1px solid var(--border);max-height:280px}
+
+  .dual{grid-template-columns:1fr}
+  .dual-arrow{display:none}
+  .scores-grid{grid-template-columns:1fr}
+  .msg-bubble{max-width:88%}
+
+  .controls{padding:10px 14px;position:sticky;bottom:0}
+  .ctrl-row{flex-wrap:wrap;gap:10px}
+  .ctrl-left,.ctrl-center,.ctrl-right{width:100%}
+  .ctrl-left,.ctrl-right{justify-content:center}
+  .step-pills{justify-content:flex-start;overflow-x:auto;padding-bottom:4px}
+  .step-pill{flex-shrink:0}
+}
+
+@media (max-width:560px){
+  .scene-title{font-size:18px}
+  .scene-desc{font-size:12px}
+  .flow-card-body{font-size:11px;line-height:1.7}
+  .autoplay-btn{padding:6px 10px}
+  .ctrl-btn{width:34px;height:34px}
+  .ctrl-btn.play{width:38px;height:38px}
+  .nav-item{min-width:180px}
+}
 </style>
 </head>
 <body>
