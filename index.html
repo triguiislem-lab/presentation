@@ -506,19 +506,19 @@ const STEPS = [
     }
   },
   {
-    id:'step5a', group:'Retrieval hybride', num:'05a', stepColor:'#ffb347', label:'Knowledge Graph', sub:'Faits structurés · VIDAL',
+    id:'step5a', group:'Retrieval hybride', num:'05a', stepColor:'#ffb347', label:'Knowledge Graph', sub:'Faits structurés · Hetionet/PrimeKG',
     phase:'RETRIEVAL',phaseColor:'#ffb347',
     title:'Étape 05a — Knowledge Graph (KG)',
-    desc:'Le moteur interroge le graphe de connaissances médicales via une requête SPARQL. Il traverse les relations médicament → effets → fréquence et retourne des faits vérifiés avec sources.',
+    desc:'Le moteur interroge le graphe de connaissances médicales via une requête Cypher. Il traverse les relations médicament → effets → fréquence et retourne des faits vérifiés avec sources.',
     liveKey:'step5a',
     render: () => `
       <div class="scene-header">
         <div class="scene-phase"><span class="phase-pill" style="color:#ffb347;border-color:rgba(255,179,71,.3);background:rgba(255,179,71,.07)">RETRIEVAL · Étape 05a</span></div>
         <div class="scene-title" style="color:#ffb347">Knowledge Graph — Faits structurés</div>
-        <div class="scene-desc">Graph traversal : Metformin → effets indésirables → fréquence → sévérité. Sources : VIDAL, DrugBank, MedDRA.</div>
+        <div class="scene-desc">Graph traversal : Metformin → effets indésirables → fréquence → sévérité. Sources : Hetionet, PrimeKG.</div>
       </div>
       <div class="flow-card" style="margin-bottom:16px">
-        <div class="flow-card-header"><span class="flow-card-label"><span class="dot-in" style="background:var(--amber)"></span>Requête SPARQL / Cypher</span></div>
+        <div class="flow-card-header"><span class="flow-card-label"><span class="dot-in" style="background:var(--amber)"></span>Requête Cypher (Neo4j)</span></div>
         <div class="flow-card-body" style="font-size:11.5px">
 <span class="cl"><span class="k">MATCH</span> (d:Drug {inn:<span class="p">"Metformin"</span>})</span>
 <span class="cl">  -[:<span class="v">HAS_SIDE_EFFECT</span>]->(s:SideEffect)</span>
@@ -539,9 +539,9 @@ const STEPS = [
         <div class="kg-row" style="margin-left:20px"><span class="kg-edge" style="margin-left:8px">↳</span><span class="kg-node severity">⚠ Acidose lactique</span><span class="kg-edge">frequency</span><span class="kg-node severity">&lt;0.01% très rare</span></div>`;
       const out = document.getElementById('kg-out'); if (!out) return;
       const items = [
-        `<span class="cl hi-add fade-in">nausée       <span class="k">freq</span>:<span class="v">&gt;10%</span>  <span class="k">sev</span>:légère  <span class="d">source:VIDAL</span></span>`,
-        `<span class="cl hi-add fade-in">diarrhée     <span class="k">freq</span>:<span class="v">&gt;10%</span>  <span class="k">sev</span>:légère  <span class="d">source:MedDRA</span></span>`,
-        `<span class="cl hi-add fade-in">acidose lact <span class="k">freq</span>:<span class="r">&lt;0.01%</span> <span class="k">sev</span>:<span class="r">GRAVE</span>   <span class="d">source:VIDAL</span></span>`,
+        `<span class="cl hi-add fade-in">nausée       <span class="k">freq</span>:<span class="v">&gt;10%</span>  <span class="k">sev</span>:légère  <span class="d">source:Hetionet</span></span>`,
+        `<span class="cl hi-add fade-in">diarrhée     <span class="k">freq</span>:<span class="v">&gt;10%</span>  <span class="k">sev</span>:légère  <span class="d">source:PrimeKG</span></span>`,
+        `<span class="cl hi-add fade-in">acidose lact <span class="k">freq</span>:<span class="r">&lt;0.01%</span> <span class="k">sev</span>:<span class="r">GRAVE</span>   <span class="d">source:PrimeKG</span></span>`,
       ];
       for (const i of items) { await wait(delay(700)); out.innerHTML += i; }
     }
@@ -625,7 +625,7 @@ const STEPS = [
         <div class="scene-desc">Le LLM génère une réponse structurée, factuelle et actionnelle à partir du contexte augmenté fusionné.</div>
       </div>
       <div class="flow-card" style="margin-bottom:16px">
-        <div class="flow-card-header"><span class="flow-card-label"><span class="dot-in"></span>Prompt augmenté → LLM (GPT-4 / Mistral-Med)</span></div>
+        <div class="flow-card-header"><span class="flow-card-label"><span class="dot-in"></span>Prompt augmenté → LLM (BioMistral7B / Llama-3.1-8B-Instruct)</span></div>
         <div class="flow-card-body" style="font-size:11px;color:var(--muted)">
           <span class="cl">Tu es un système CDSS. Génère une réponse structurée</span>
           <span class="cl">à partir du contexte clinique fourni. Format JSON strict.</span>
@@ -695,7 +695,7 @@ const STEPS = [
       const lines = [
         `<span class="cl hi-add fade-in"><span class="k">confidence</span>:    <span class="v">0.91</span></span>`,
         `<span class="cl hi-add fade-in"><span class="k">halluci_risk</span>: <span class="v">LOW</span>  <span class="d">(all claims sourced in KG)</span></span>`,
-        `<span class="cl hi-add fade-in"><span class="k">sources</span>:       [<span class="p">"VIDAL 2024"</span>, <span class="p">"RCP Metformine"</span>]</span>`,
+        `<span class="cl hi-add fade-in"><span class="k">sources</span>:       [<span class="p">"Hetionet"</span>, <span class="p">"PrimeKG"</span>]</span>`,
         `<span class="cl hi-add fade-in"><span class="k">disclaimer</span>:   <span class="p">"Aide à la décision — validation clinique requise"</span></span>`,
         `<span class="cl hi-add fade-in"><span class="k">audit_id</span>:     <span class="d">uuid-4f2a-8c1d-bb3e</span></span>`,
       ];
@@ -754,11 +754,11 @@ const LIVE_VALS = {
   step2:   [{v:'3 turns'},{v:'patient, medecin'},{v:'préservé'}],
   step3:   [{v:'Metformine'},{v:'500mg×2/j'},{v:'nausées,diarrhées'},{v:'3 jours'},{v:'SAFETY_QUERY'}],
   step4:   [{v:'side_effects'},{v:'Metformin (A10BA02)'},{v:'SAFETY_DECISION'},{v:'T2DM·début traitement'}],
-  step5a:  [{v:'3 faits KG'},{v:'nausée >10%'},{v:'VIDAL·MedDRA'}],
+  step5a:  [{v:'3 faits KG'},{v:'nausée >10%'},{v:'Hetionet·PrimeKG'}],
   step5b:  [{v:'4 passages'},{v:'sim=0.94'},{v:'RCP·HAS·Cases'}],
   step6:   [{v:'1,240 tokens'},{v:'3 facts merged'},{v:'2 passages merged'}],
   step7:   [{v:'effets GI fréquents'},{v:'prise au repas'},{v:'douleurs intenses'}],
-  step8:   [{v:'0.91'},{v:'LOW'},{v:'VIDAL·RCP'}],
+  step8:   [{v:'0.91'},{v:'LOW'},{v:'Hetionet·PrimeKG'}],
   output:  [{v:'✓ validated'},{v:'JSON·FHIR·HL7'},{v:'uuid-4f2a...'}]
 };
 
